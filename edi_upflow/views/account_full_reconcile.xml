@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2023 Foodles (http://www.foodles.co).
+     @author Pierre Verkest <pierreverkest84@gmail.com>
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). -->
+<odoo>
+    <record model="ir.ui.view" id="account_move_form_view">
+        <field name="name">account.move.form (in edi_account)</field>
+        <field name="model">account.full.reconcile</field>
+        <field name="inherit_id" ref="account.view_full_reconcile_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//form/group" position="before">
+                <div name="button_box" class="oe_button_box">
+                    <button
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-retweet"
+                        attrs="{'invisible': [('exchange_record_count', '=', 0)]}"
+                        name="action_view_edi_records"
+                    >
+                        <div class="o_form_field o_stat_info">
+                            <span class="o_stat_value">
+                                <field name="exchange_record_count" />
+                            </span>
+                            <span class="o_stat_text">EDI</span>
+                        </div>
+                    </button>
+                </div>
+            </xpath>
+
+            <xpath expr="//form" position="inside">
+                <!-- Chatter -->
+                <div class="oe_chatter">
+                    <field
+                        name="message_follower_ids"
+                        widget="mail_followers"
+                        groups="base.group_user"
+                    />
+                    <field name="message_ids" widget="mail_thread" />
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
