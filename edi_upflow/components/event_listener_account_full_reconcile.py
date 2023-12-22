@@ -57,30 +57,35 @@ class AccountFullReconcileUpflowEventListener(Component):
                 ongoing_move_exchanges | finalized_move_exchanges
             )
         else:
-            if move.commercial_partner_id:
-                # create payment from bank statements
-                # do not necessarily generate account.payment
+            self._create_missing_exchange_record(
+                reconcile_exchange, move, exchange_type
+            )
 
-                # At this point we expect customer to be already synchronized
-                exchange = self._create_and_generate_upflow_exchange_record(
-                    move.commercial_partner_id.upflow_edi_backend_id
-                    or self._get_followup_backend(move),
-                    exchange_type,
-                    move,
+    def _create_missing_exchange_record(self, reconcile_exchange, move, exchange_type):
+        if move.upflow_commercial_partner_id:
+            # create payment from bank statements
+            # do not necessarily generate account.payment
+
+            # At this point we expect customer to be already synchronized
+            exchange = self._create_and_generate_upflow_exchange_record(
+                move.commercial_partner_id.upflow_edi_backend_id
+                or self._get_followup_backend(move),
+                exchange_type,
+                move,
+            )
+            reconcile_exchange.dependent_exchange_ids |= exchange
+        else:
+            raise UserError(
+                _(
+                    "You can reconcile journal items because the journal entry "
+                    "%s (ID: %s) is not synchronisable with upflow.io, "
+                    "because partner is not set but required."
                 )
-                reconcile_exchange.dependent_exchange_ids |= exchange
-            else:
-                raise UserError(
-                    _(
-                        "You can reconcile journal items because the journal entry "
-                        "%s (ID: %s) is not synchronisable with upflow.io, "
-                        "because partner is not set but required."
-                    )
-                    % (
-                        move.name,
-                        move.id,
-                    )
+                % (
+                    move.name,
+                    move.id,
                 )
+            )
 
     def _is_customer_entry(self, reconcile):
         """Return true when all moves are linked to receivable lines"""
