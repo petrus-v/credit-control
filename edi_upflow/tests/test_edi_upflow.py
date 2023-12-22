@@ -1799,25 +1799,52 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
             self.env["edi.exchange.record"].search_count(payments_domain), 0
         )
         with trap_jobs() as trap:
-            with self.assertRaisesRegex(
-                UserError,
-                "You can reconcile journal items because the journal entry .* "
-                "is not synchronisable with upflow.io, because partner is not "
-                "set but required.",
-            ):
-                self._make_credit_transfer_payment_reconciled(
-                    self.invoice,
-                    reconcile_param=[
-                        {
-                            "id": self.invoice.line_ids.filtered(
-                                lambda line: line.account_internal_type
-                                in ("receivable", "payable")
-                            ).id
-                        }
-                    ],
-                    partner=False,
-                )
-                trap.assert_jobs_count(0, only=self.backend.exchange_generate)
+            self._make_credit_transfer_payment_reconciled(
+                self.invoice,
+                reconcile_param=[
+                    {
+                        "id": self.invoice.line_ids.filtered(
+                            lambda line: line.account_internal_type
+                            in ("receivable", "payable")
+                        ).id
+                    }
+                ],
+                partner=False,
+            )
+            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+        self.assertEqual(
+            self.env["edi.exchange.record"].search_count(reconcile_domain), 1
+        )
+        self.assertEqual(
+            self.env["edi.exchange.record"].search_count(payments_domain), 1
+        )
+
+    def test_create_missing_exchange_record_without_partner(self):
+        move_payment_id = self._make_credit_transfer_payment_reconciled(
+            self.invoice,
+            reconcile_param=[
+                {
+                    "id": self.invoice.line_ids.filtered(
+                        lambda line: line.account_internal_type
+                        in ("receivable", "payable")
+                    ).id
+                }
+            ],
+            partner=False,
+        )
+        move_payment_id.line_ids.partner_id = False
+        move_payment_id._compute_upflow_commercial_partner_id()
+        with self.assertRaisesRegex(
+            UserError,
+            "You can reconcile journal items because the journal entry .* "
+            "is not synchronisable with upflow.io, because partner is not "
+            "set but required.",
+        ):
+            self.comp_registry["account.full.reconcile.upflow.event.listener"](
+                None
+            )._create_missing_exchange_record(
+                self.env["edi.exchange.record"].browse(), move_payment_id, "test2"
+            )
 
     def test_upflow_post_reconcile(self):
         self._register_manual_payment_reconciled(self.invoice)
