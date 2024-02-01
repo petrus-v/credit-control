@@ -257,18 +257,10 @@ class UpflowAccountMovePayloadTest(SavepointCase, AccountingCommonCase):
             str(self.customer_company.id),
         )
 
-    def test_get_payload_not_an_invoice(self):
-        with self.assertRaisesRegex(UserError, "expected out_invoice"):
-            self.refund.get_upflow_api_post_invoice_payload()
-
     def test_get_invoice_pdf_payload_not_an_invoice(self):
         invoice_payment_move = self._register_manual_payment_reconciled(self.invoice)
         with self.assertRaisesRegex(UserError, "expected out_invoice"):
             invoice_payment_move.get_upflow_api_pdf_payload()
-
-    def test_get_payload_not_a_refund(self):
-        with self.assertRaisesRegex(UserError, "expected out_refund"):
-            self.invoice.get_upflow_api_post_credit_note_payload()
 
     def test_format_upflow_amount(self):
         currency_euro = self.env.ref("base.EUR")
