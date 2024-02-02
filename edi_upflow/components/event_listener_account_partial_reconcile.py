@@ -11,11 +11,11 @@ from odoo.addons.component.core import Component
 logger = logging.getLogger(__name__)
 
 
-class AccountFullReconcileUpflowEventListener(Component):
+class AccountPartialReconcileUpflowEventListener(Component):
 
-    _name = "account.full.reconcile.upflow.event.listener"
+    _name = "account.partial.reconcile.upflow.event.listener"
     _inherit = "base.upflow.event.listener"
-    _apply_on = ["account.full.reconcile"]
+    _apply_on = ["account.partial.reconcile"]
 
     def _filter_relevant_account_event_state_method(self, states):
         """Only accounting event (ignore pdf events)"""
@@ -30,7 +30,7 @@ class AccountFullReconcileUpflowEventListener(Component):
             and ex.edi_exchange_state in states
         )
 
-    def _ensure_related_move_is_synced(self, reconcile_exchange, move, exchange_type):
+    def _ensure_related_move_is_synced(self, reconcile_exchange, move):
         "output_sent_and_processed"
         ongoing_move_exchanges = move.exchange_record_ids.filtered(
             self._filter_relevant_account_event_state_method(
@@ -57,23 +57,15 @@ class AccountFullReconcileUpflowEventListener(Component):
                 ongoing_move_exchanges | finalized_move_exchanges
             )
         else:
-            self._create_missing_exchange_record(
-                reconcile_exchange, move, exchange_type
-            )
+            self._create_missing_exchange_record(reconcile_exchange, move)
 
-    def _create_missing_exchange_record(self, reconcile_exchange, move, exchange_type):
+    def _create_missing_exchange_record(self, reconcile_exchange, move):
         if move.upflow_commercial_partner_id:
             # create payment from bank statements
             # do not necessarily generate account.payment
 
             # At this point we expect customer to be already synchronized
-            exchange = self._create_and_generate_upflow_exchange_record(
-                move.commercial_partner_id.upflow_edi_backend_id
-                or self._get_followup_backend(move),
-                exchange_type,
-                move,
-            )
-            reconcile_exchange.dependent_exchange_ids |= exchange
+            reconcile_exchange.dependent_exchange_ids |= self.send_moves_to_upflow(move)
         else:
             raise UserError(
                 _(
@@ -88,56 +80,63 @@ class AccountFullReconcileUpflowEventListener(Component):
             )
 
     def _is_customer_entry(self, reconcile):
-        """Return true when all moves are linked to receivable lines"""
-        return all(
-            [
-                acc_type.type == "receivable"
-                for acc_type in reconcile.reconciled_line_ids.account_id.user_type_id
-            ]
+        # both should share the same type anyway
+        return (
+            reconcile.debit_move_id.account_id.user_type_id.type == "receivable"
+            or reconcile.credit_move_id.account_id.user_type_id.type == "receivable"
         )
 
-    def on_record_create(self, account_full_reconcile, fields=None):
-        if not self._is_customer_entry(account_full_reconcile):
+    def _get_reconcile_partner(self, account_partial_reconcile):
+        """credit/debit move line should be link to the same partner
+        and partner_id should be present on receivable account.move.line
+
+        Anyway we try to be kind here and find
+        """
+        return (
+            account_partial_reconcile.debit_move_id.partner_id.commercial_partner_id
+            or account_partial_reconcile.credit_move_id.partner_id.commercial_partner_id
+            or account_partial_reconcile.debit_move_id.move_id.commercial_partner_id
+            or account_partial_reconcile.credit_move_id.move_id.commercial_partner_id
+        )
+
+    def _get_backend(self, account_partial_reconcile):
+        partner = self._get_reconcile_partner(account_partial_reconcile)
+        return partner.upflow_edi_backend_id or self._get_followup_backend(
+            account_partial_reconcile.debit_move_id.move_id
+        )
+
+    def on_record_create(self, account_partial_reconcile, fields=None):
+        if not self._is_customer_entry(account_partial_reconcile):
             return
-        first_move = account_full_reconcile.reconciled_line_ids.filtered(
-            lambda move_line: move_line.move_id.commercial_partner_id
-        )[0].move_id
+
         reconcile_exchange = self._create_and_generate_upflow_exchange_record(
-            first_move.commercial_partner_id.upflow_edi_backend_id
-            or self._get_followup_backend(first_move),
+            self._get_backend(account_partial_reconcile),
             "upflow_post_reconcile",
-            account_full_reconcile,
+            account_partial_reconcile,
         )
         if not reconcile_exchange:
             # in case no backend is returned there are nothing to do
             return
-        for partial in account_full_reconcile.partial_reconcile_ids:
-            self._ensure_related_move_is_synced(
-                reconcile_exchange,
-                partial.credit_move_id.move_id,
-                "upflow_post_payments",
-            )
-            self._ensure_related_move_is_synced(
-                reconcile_exchange, partial.debit_move_id.move_id, "upflow_post_refunds"
-            )
+        self._ensure_related_move_is_synced(
+            reconcile_exchange,
+            account_partial_reconcile.credit_move_id.move_id,
+        )
+        self._ensure_related_move_is_synced(
+            reconcile_exchange,
+            account_partial_reconcile.debit_move_id.move_id,
+        )
 
-    def on_record_unlink(self, account_full_reconcile):
-        if account_full_reconcile.sent_to_upflow:
+    def on_record_unlink(self, account_partial_reconcile):
+        if account_partial_reconcile.sent_to_upflow:
             # we are not using _create_and_generate_upflow_exchange_record
             # here because we want to generate payload synchronously
             # after wards record will be unlinked with no chance to retrieves
             # upflow_uuid
-            first_move = account_full_reconcile.reconciled_line_ids.filtered(
-                lambda move_line: move_line.move_id.commercial_partner_id
-            )[0].move_id
-            backend = (
-                first_move.commercial_partner_id.upflow_edi_backend_id
-                or self._get_followup_backend(first_move)
-            )
+            backend = self._get_backend(account_partial_reconcile)
             if backend:
                 exchange_record = backend.create_record(
                     "upflow_post_reconcile",
-                    self._get_exchange_record_vals(account_full_reconcile),
+                    self._get_exchange_record_vals(account_partial_reconcile),
                 )
                 backend.with_context(unlinking_reconcile=True).exchange_generate(
                     exchange_record

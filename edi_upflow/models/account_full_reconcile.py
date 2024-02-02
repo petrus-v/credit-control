@@ -4,11 +4,13 @@
 from odoo import fields, models
 
 
-class AccountJournal(models.Model):
-    _name = "account.full.reconcile"
-    _inherit = ["account.full.reconcile", "mail.thread", "edi.exchange.consumer.mixin"]
+class AccountFullReconcile(models.Model):
+    _inherit = "account.full.reconcile"
 
     sent_to_upflow = fields.Boolean(
         default=False,
-        help="Technical field to know if the record has been synchronized with upflow",
+        help=(
+            "Technical field to remove in next version used "
+            "to migrate from full reconcile synced to partial.",
+        ),
     )

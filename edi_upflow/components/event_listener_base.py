@@ -30,3 +30,44 @@ class BaseUpflowEventListner(Component):
         else:
             return self.env["edi.exchange.record"]
         return exchange_record
+
+    def send_moves_to_upflow(self, moves):
+        move_exchanges = self.env["edi.exchange.record"].browse()
+        # if a lot of things happen in this same transaction probably
+        # depends are not computed yet better to refresh value
+        moves._compute_upflow_type()
+        for move in moves:
+            exchange_type, pdf_exchange = move.mapping_upflow_exchange().get(
+                move.upflow_type,
+                (
+                    None,
+                    None,
+                ),
+            )
+
+            if not exchange_type:
+                continue
+            customer_exchange = self.env["edi.exchange.record"]
+            backend = (
+                move.upflow_commercial_partner_id.upflow_edi_backend_id
+                or self._get_followup_backend(move)
+            )
+            if not move.upflow_commercial_partner_id.upflow_uuid:
+                customer_exchange = self._create_and_generate_upflow_exchange_record(
+                    backend, "upflow_post_customers", move.upflow_commercial_partner_id
+                )
+                move.upflow_commercial_partner_id.upflow_edi_backend_id = backend
+            account_move_exchange = self._create_and_generate_upflow_exchange_record(
+                backend, exchange_type, move
+            )
+            if not account_move_exchange:
+                # empty recordset could be return in case no backend found
+                continue
+            account_move_exchange.dependent_exchange_ids |= customer_exchange
+            if pdf_exchange:
+                pdf_exchange = self._create_and_generate_upflow_exchange_record(
+                    backend, pdf_exchange, move
+                )
+                pdf_exchange.dependent_exchange_ids |= account_move_exchange
+            move_exchanges |= account_move_exchange
+        return move_exchanges
