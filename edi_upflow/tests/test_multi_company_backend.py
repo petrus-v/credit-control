@@ -36,7 +36,7 @@ class TestNoCompanyBackendSet(EDIUpflowCommonCase):
 
     def test_on_create_account_full_reconcile_do_not_create_exchange_record(self):
         domain = [
-            ("model", "=", "account.full.reconcile"),
+            ("model", "=", "account.partial.reconcile"),
             (
                 "type_id",
                 "=",

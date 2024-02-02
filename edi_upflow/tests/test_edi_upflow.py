@@ -554,6 +554,95 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
 
     @mute_logger("odoo.addons.queue_job.delay")
     @responses.activate
+    def test_output_exchange_sync_post_credit_notes_as_payment_flow(self):
+        """Testing forcing upflow type"""
+        generated_content = '{"some": "value"}'
+        credit_note_uuid = str(uuid4())
+        response_result = json.dumps(
+            {
+                "customId": "FAC123",
+                "externalId": "92842AB37",
+                "issuedAt": "2015-05-05T12:30:00",
+                "dueDate": "2015-05-05T12:30:00",
+                "name": "Facture couvrant les prestations de service de Decembre",
+                "currency": "EUR",
+                "grossAmount": 1700,
+                "netAmount": 1500,
+                "id": credit_note_uuid,
+                "pdfUrl": "http://example.com/invoice.pdf",
+                "customer": {
+                    "id": "00a70b35-2be3-4c43-aefb-397190134655",
+                    "externalId": "1a2c3b",
+                    "companyName": "Upflow SAS",
+                    "accountingRef": "UPFL",
+                },
+                "linkedInvoices": [],
+            }
+        )
+
+        responses.add(
+            responses.POST,
+            self.upflow_ws.url.format(endpoint="v1/customers"),
+            body=json.dumps({"id": str(uuid4())}),
+        )
+        responses.add(
+            responses.POST,
+            self.upflow_ws.url.format(endpoint="v1/payments"),
+            body=response_result,
+        )
+        self.refund.upflow_type = "payments"
+        with mock.patch(
+            "odoo.addons.edi_upflow.components"
+            ".edi_output_generate_upflow_post_payments"
+            ".EdiOutputGenerateUpflowPostPayments.generate",
+            return_value=generated_content,
+        ) as m_generate:
+            self.refund.action_post()
+            m_generate.assert_called_once()
+
+        self.assertEqual(len(responses.calls), 2)
+        self.assertEqual(
+            [call for call in responses.calls if call.request.url.endswith("payments")][
+                0
+            ].request.body,
+            generated_content,
+        )
+        records = self.env["edi.exchange.record"].search(
+            [
+                ("model", "=", "account.move"),
+                ("res_id", "=", self.refund.id),
+                (
+                    "type_id",
+                    "=",
+                    self.env.ref(
+                        "edi_upflow.upflow_edi_exchange_type_post_credit_notes"
+                    ).id,
+                ),
+            ]
+        )
+        self.assertEqual(len(records), 0)
+        records = self.env["edi.exchange.record"].search(
+            [
+                ("model", "=", "account.move"),
+                ("res_id", "=", self.refund.id),
+                (
+                    "type_id",
+                    "=",
+                    self.env.ref(
+                        "edi_upflow.upflow_edi_exchange_type_post_payments"
+                    ).id,
+                ),
+            ]
+        )
+        self.assertEqual(len(records), 1)
+
+        self.refund.upflow_type = "none"
+        self.refund._compute_upflow_type()
+        self.assertEqual(self.refund.upflow_type, "payments")
+        self.assertEqual(records.edi_exchange_state, "output_sent_and_processed")
+
+    @mute_logger("odoo.addons.queue_job.delay")
+    @responses.activate
     def test_output_exchange_sync_post_credit_notes_flow_pdf(self):
         generated_content = '{"some": "value"}'
         credit_note_uuid = str(uuid4())
@@ -860,7 +949,7 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
                     ("full_reconcile_id", "=", False),
                 ]
             ).reconcile()
-            full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
+            partial_reconcile = self.invoice.line_ids.matched_credit_ids
             m_generate.assert_called_once()
 
         self.assertEqual(len(responses.calls), 5)
@@ -874,8 +963,8 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
         )
         records = self.env["edi.exchange.record"].search(
             [
-                ("model", "=", full_reconcile._name),
-                ("res_id", "in", full_reconcile.ids),
+                ("model", "=", partial_reconcile._name),
+                ("res_id", "in", partial_reconcile.ids),
                 (
                     "type_id",
                     "=",
@@ -922,8 +1011,8 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
         )
         self.invoice.action_post()
         self._register_manual_payment_reconciled(self.invoice)
-        full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
-        full_reconcile.unlink()
+        partial_reconcile = self.invoice.line_ids.matched_credit_ids
+        partial_reconcile.unlink()
 
         self.assertEqual(len(responses.calls), 6)
         reconcile_calls = [
@@ -937,8 +1026,8 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
         )
         records = self.env["edi.exchange.record"].search(
             [
-                ("model", "=", full_reconcile._name),
-                ("res_id", "in", full_reconcile.ids),
+                ("model", "=", partial_reconcile._name),
+                ("res_id", "in", partial_reconcile.ids),
                 (
                     "type_id",
                     "=",
@@ -1018,7 +1107,7 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
                 lambda l: l.account_id.user_type_id.type,
             ):
                 group.reconcile()
-            full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
+            partial_reconcile = self.invoice.line_ids.matched_credit_ids
             m_generate.assert_called_once()
 
         self.assertEqual(len(responses.calls), 6)
@@ -1032,8 +1121,8 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
         )
         records = self.env["edi.exchange.record"].search(
             [
-                ("model", "=", full_reconcile._name),
-                ("res_id", "in", full_reconcile.ids),
+                ("model", "=", partial_reconcile._name),
+                ("res_id", "in", partial_reconcile.ids),
                 (
                     "type_id",
                     "=",
@@ -1646,9 +1735,9 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         super()._setup_records()
         cls.invoice = cls._create_invoice(auto_validate=True)
 
-    def test_on_create_account_full_reconcile_create_exchange_record(self):
+    def test_on_create_account_partial_reconcile_create_exchange_record(self):
         domain = [
-            ("model", "=", "account.full.reconcile"),
+            ("model", "=", "account.partial.reconcile"),
             (
                 "type_id",
                 "=",
@@ -1685,7 +1774,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         self,
     ):
         reconcile_domain = [
-            ("model", "=", "account.full.reconcile"),
+            ("model", "=", "account.partial.reconcile"),
             (
                 "type_id",
                 "=",
@@ -1707,6 +1796,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         self.assertEqual(
             self.env["edi.exchange.record"].search_count(payments_domain), 0
         )
+        self.invoice.commercial_partner_id.upflow_uuid = "abc"
         with trap_jobs() as trap:
             self._make_credit_transfer_payment_reconciled(
                 self.invoice,
@@ -1776,7 +1866,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         self,
     ):
         reconcile_domain = [
-            ("model", "=", "account.full.reconcile"),
+            ("model", "=", "account.partial.reconcile"),
             (
                 "type_id",
                 "=",
@@ -1798,6 +1888,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         self.assertEqual(
             self.env["edi.exchange.record"].search_count(payments_domain), 0
         )
+        self.invoice.commercial_partner_id.upflow_uuid = "abc"
         with trap_jobs() as trap:
             self._make_credit_transfer_payment_reconciled(
                 self.invoice,
@@ -1840,20 +1931,20 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
             "is not synchronisable with upflow.io, because partner is not "
             "set but required.",
         ):
-            self.comp_registry["account.full.reconcile.upflow.event.listener"](
+            self.comp_registry["account.partial.reconcile.upflow.event.listener"](
                 None
             )._create_missing_exchange_record(
-                self.env["edi.exchange.record"].browse(), move_payment_id, "test2"
+                self.env["edi.exchange.record"].browse(), move_payment_id
             )
 
     def test_upflow_post_reconcile(self):
         self._register_manual_payment_reconciled(self.invoice)
-        full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
+        partial_reconcile = self.invoice.line_ids.matched_credit_ids
         record = self.backend.create_record(
             "upflow_post_reconcile",
             {
-                "model": full_reconcile._name,
-                "res_id": full_reconcile.id,
+                "model": partial_reconcile._name,
+                "res_id": partial_reconcile.id,
             },
         )
         self.backend.exchange_generate(record)
@@ -1863,12 +1954,12 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
 
     def test_upflow_post_reconcile_match_generate(self):
         self._register_manual_payment_reconciled(self.invoice)
-        full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
+        partial_reconcile = self.invoice.line_ids.matched_credit_ids
         record = self.backend.create_record(
             "upflow_post_reconcile",
             {
-                "model": full_reconcile._name,
-                "res_id": full_reconcile.id,
+                "model": partial_reconcile._name,
+                "res_id": partial_reconcile.id,
             },
         )
         generated_content = '{"some": "value"}'
@@ -1884,12 +1975,12 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
 
     def test_upflow_post_reconcile_check(self):
         self._register_manual_payment_reconciled(self.invoice)
-        full_reconcile = self.invoice.line_ids.mapped("full_reconcile_id")
+        partial_reconcile = self.invoice.line_ids.matched_credit_ids
         exchange_record = self.backend.create_record(
             "upflow_post_reconcile",
             {
-                "model": full_reconcile._name,
-                "res_id": full_reconcile.id,
+                "model": partial_reconcile._name,
+                "res_id": partial_reconcile.id,
             },
         )
         exchange_record._set_file_content(

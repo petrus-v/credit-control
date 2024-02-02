@@ -4,7 +4,7 @@
 {
     "name": "EDI UPFLOW",
     "summary": "Odoo Upflow.io connector",
-    "version": "14.0.1.1.0",
+    "version": "14.0.2.0.0",
     "development_status": "Alpha",
     "category": "EDI",
     "website": "https://github.com/OCA/credit-control",
@@ -24,6 +24,7 @@
         "data/cron.xml",
         "data/edi.xml",
         "views/account_full_reconcile.xml",
+        "views/account_partial_reconcile.xml",
         "views/edi_exchange_record.xml",
         "views/res_config_settings.xml",
         "views/res_partner.xml",

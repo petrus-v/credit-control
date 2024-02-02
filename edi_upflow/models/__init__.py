@@ -1,4 +1,6 @@
+from . import account_move
 from . import account_full_reconcile
+from . import account_partial_reconcile
 from . import edi_exchange_record
 from . import webservice_backend
 from . import res_partner
