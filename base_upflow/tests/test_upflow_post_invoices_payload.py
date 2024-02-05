@@ -504,7 +504,7 @@ class UpflowAccountMovePayloadTest(SavepointCase, AccountingCommonCase):
                 reconcile_content,
             )
 
-            expected_payload["externalId"] = str(partial_reconcile.id)
+            expected_payload["externalId"] = "partial-" + str(partial_reconcile.id)
             self.assertEqual(reconcile_content, expected_payload)
 
     def test_get_upflow_api_post_reconcile_refund_payload(self):
@@ -542,7 +542,7 @@ class UpflowAccountMovePayloadTest(SavepointCase, AccountingCommonCase):
         )
 
         expected = {
-            "externalId": str(full_reconcile.partial_reconcile_ids.id),
+            "externalId": "partial-" + str(full_reconcile.partial_reconcile_ids.id),
             "invoices": [],
             "payments": [],
             "creditNotes": [

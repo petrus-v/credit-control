@@ -10,7 +10,7 @@ class AccountPartialReconcile(models.Model):
 
     def _prepare_reconcile_payload(self):
         payload = {
-            "externalId": str(self.id),
+            "externalId": "partial-" + str(self.id),
             "invoices": [],
             "payments": [],
             "creditNotes": [],
