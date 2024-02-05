@@ -93,6 +93,8 @@ class AccountMove(models.Model):
                         "Sum of receivable move lines on %s have credit (%d) and debit(%d). "
                         "Which sounds suspicious and can't set upflow type",
                         move.name,
+                        credit,
+                        debit,
                     )
                     move.upflow_type = "none"
 
