@@ -13,11 +13,16 @@ class EdiOutputGenerateUpflowPostReconcile(Component):
 
     def generate(self):
         self._wait_related_exchange_to_be_sent_and_processed()
-        payload = None
-        if self.env.context.get("unlinking_reconcile", False):
-            payload = self.exchange_record.record._prepare_reconcile_payload()
-        else:
-            payload = (
-                self.exchange_record.record.get_upflow_api_post_reconcile_payload()
+        if not self.record:
+            raise EdiOutputGenerateUpflowPostReconcileError(
+                "No record found to generate the payload."
             )
+        if self.env.context.get("unlinking_reconcile", False):
+            payload = self.record._prepare_reconcile_payload()
+        else:
+            payload = self.record.get_upflow_api_post_reconcile_payload()
         return json.dumps(payload)
+
+
+class EdiOutputGenerateUpflowPostReconcileError(Exception):
+    pass
