@@ -1,8 +1,9 @@
 from odoo.tests.common import tagged
 
 from odoo.addons.edi_upflow.components.edi_output_generate_upflow_post_reconcile import (
-    EdiOutputGenerateUpflowPostReconcileError
+    EdiOutputGenerateUpflowPostReconcileError,
 )
+
 from .common import EDIUpflowCommonCase
 
 
@@ -19,6 +20,6 @@ class TestEdiUpflowError(EDIUpflowCommonCase):
         )
         with self.assertRaisesRegex(
             EdiOutputGenerateUpflowPostReconcileError,
-            "No record found to generate the payload."
+            "No record found to generate the payload.",
         ):
             self.backend.exchange_generate(record)
