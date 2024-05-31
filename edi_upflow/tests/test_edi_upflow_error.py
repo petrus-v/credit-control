@@ -1,5 +1,8 @@
 from odoo.tests.common import tagged
 
+from odoo.addons.edi_upflow.components.edi_output_generate_upflow_post_customers import (
+    EdiOutputGenerateUpflowPostCustomersError,
+)
 from odoo.addons.edi_upflow.components.edi_output_generate_upflow_post_reconcile import (
     EdiOutputGenerateUpflowPostReconcileError,
 )
@@ -20,6 +23,21 @@ class TestEdiUpflowError(EDIUpflowCommonCase):
         )
         with self.assertRaisesRegex(
             EdiOutputGenerateUpflowPostReconcileError,
+            "No record found to generate the payload.",
+        ):
+            self.backend.exchange_generate(record)
+
+    def test_generate_post_customers_with_no_customer(self):
+        customer = self.env["res.partner"].browse()
+        record = self.backend.create_record(
+            "upflow_post_customers",
+            {
+                "model": customer._name,
+                "res_id": customer.id,
+            },
+        )
+        with self.assertRaisesRegex(
+            EdiOutputGenerateUpflowPostCustomersError,
             "No record found to generate the payload.",
         ):
             self.backend.exchange_generate(record)

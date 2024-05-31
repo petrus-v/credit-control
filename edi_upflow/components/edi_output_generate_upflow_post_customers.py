@@ -12,6 +12,13 @@ class EdiOutputGenerateUpflowPostCustomers(Component):
     _exchange_type = "upflow_post_customers"
 
     def generate(self):
-        return json.dumps(
-            self.exchange_record.record.get_upflow_api_post_customers_payload()
-        )
+        if not self.record:
+            raise EdiOutputGenerateUpflowPostCustomersError(
+                "No record found to generate the payload."
+            )
+        payload = self.record.get_upflow_api_post_customers_payload()
+        return json.dumps(payload)
+
+
+class EdiOutputGenerateUpflowPostCustomersError(Exception):
+    pass
