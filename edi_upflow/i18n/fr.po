@@ -93,7 +93,6 @@ msgid "Disable auto"
 msgstr ""
 
 #. module: edi_upflow
-#: model:ir.model.fields,field_description:edi_upflow.field_account_full_reconcile__display_name
 #: model:ir.model.fields,field_description:edi_upflow.field_account_move__display_name
 #: model:ir.model.fields,field_description:edi_upflow.field_account_partial_reconcile__display_name
 #: model:ir.model.fields,field_description:edi_upflow.field_edi_exchange_record__display_name
@@ -174,12 +173,6 @@ msgid ""
 msgstr "Les echanges EDI suivant doivent être traité avant l'echange actuel."
 
 #. module: edi_upflow
-#: model:ir.model,name:edi_upflow.model_account_full_reconcile
-msgid "Full Reconcile"
-msgstr "Lettrage complet"
-
-#. module: edi_upflow
-#: model:ir.model.fields,field_description:edi_upflow.field_account_full_reconcile__id
 #: model:ir.model.fields,field_description:edi_upflow.field_account_move__id
 #: model:ir.model.fields,field_description:edi_upflow.field_account_partial_reconcile__id
 #: model:ir.model.fields,field_description:edi_upflow.field_edi_exchange_record__id
@@ -213,7 +206,6 @@ msgid "Journal Entry"
 msgstr "Pièce comptable"
 
 #. module: edi_upflow
-#: model:ir.model.fields,field_description:edi_upflow.field_account_full_reconcile____last_update
 #: model:ir.model.fields,field_description:edi_upflow.field_account_move____last_update
 #: model:ir.model.fields,field_description:edi_upflow.field_account_partial_reconcile____last_update
 #: model:ir.model.fields,field_description:edi_upflow.field_edi_exchange_record____last_update
@@ -295,7 +287,6 @@ msgid "SMS Delivery error"
 msgstr "Erreur d'envoi SMS"
 
 #. module: edi_upflow
-#: model:ir.model.fields,field_description:edi_upflow.field_account_full_reconcile__sent_to_upflow
 #: model:ir.model.fields,field_description:edi_upflow.field_account_partial_reconcile__sent_to_upflow
 msgid "Sent To Upflow"
 msgstr "Envoyé à upflow"
@@ -308,13 +299,6 @@ msgstr ""
 "dans upflow"
 
 #. module: edi_upflow
-#: model:ir.model.fields,help:edi_upflow.field_account_full_reconcile__sent_to_upflow
-msgid ""
-"Technical field to remove in next version used to migrate from full "
-"reconcile synced to partial."
-msgstr ""
-
-#. module: edi_upflow
 #: model:ir.model.fields,help:edi_upflow.field_account_bank_statement_line__upflow_type
 #: model:ir.model.fields,help:edi_upflow.field_account_move__upflow_type
 #: model:ir.model.fields,help:edi_upflow.field_account_payment__upflow_type
@@ -324,6 +308,16 @@ msgid ""
 "reconcile. While creating malicious entries it can be hard to automatically "
 "choose proper type"
 msgstr ""
+
+#. module: edi_upflow
+#: code:addons/edi_upflow/components/event_listener_account_partial_reconcile.py:0
+#, python-format
+msgid ""
+"This job has been canceled and its associated EDI exchange was deleted "
+"because the associated reconciliation was deleted"
+msgstr ""
+"Cette tâche a été annulée et l'échange EDI associé a été supprimé car la "
+"réconciliation associée a été supprimée"
 
 #. module: edi_upflow
 #: model:ir.model.fields,field_description:edi_upflow.field_account_partial_reconcile__message_unread

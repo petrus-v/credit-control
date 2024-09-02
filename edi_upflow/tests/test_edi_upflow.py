@@ -113,7 +113,7 @@ class TestEDIUpflowBaseClasses(EDIUpflowCommonCase):
             r"to create the payload or fix the exchange type. "
             r"\(Received exchange type code: upflow_post_something\)",
         ):
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
 
     def test_check_not_implemented(self):
         class EdiOutputCheckUpflowPostSomething(Component):
@@ -1266,8 +1266,8 @@ class TestEDIUpflowInvoices(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.invoice.action_post()
-            # 1 customer + 1 invoice + 1 PDF=> 2 jobs
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            # 1 customer + 1 invoice + 1 PDF => 3 jobs
+            trap.assert_jobs_count(3)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")
@@ -1284,8 +1284,8 @@ class TestEDIUpflowInvoices(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.invoice.action_post()
-            # 1 invoice + 1 PDF=> 2 jobs
-            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+            # 1 invoice + 1 PDF => 2 jobs
+            trap.assert_jobs_count(2)
         self.assertEqual(
             self.env["edi.exchange.record"].search_count(
                 domain
@@ -1336,12 +1336,12 @@ class TestEDIUpflowInvoices(EDIUpflowCommonCase):
         with trap_jobs() as trap:
             self.invoice.action_post()
             # 1 customer + 1 invoice + 1 invoice PDF => 3 jobs
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
             account_move_job = [
                 job
                 for job in trap.enqueued_jobs
-                if job.args[0].res_id == self.invoice.id
-                and job.args[0].model == "account.move"
+                if job.recordset.res_id == self.invoice.id
+                and job.recordset.model == "account.move"
             ][0]
             with self.assertRaisesRegex(
                 RetryableJobError, "Waiting related exchanges to be done before"
@@ -1356,7 +1356,7 @@ class TestEDIUpflowInvoices(EDIUpflowCommonCase):
                 "res_id": self.invoice.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1376,7 +1376,7 @@ class TestEDIUpflowInvoices(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostInvoice.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1425,7 +1425,7 @@ class TestEDIUpflowInvoicesPDF(EDIUpflowCommonCase):
         with trap_jobs() as trap:
             self.invoice.action_post()
             # 1 customer + 1 invoice + 1 invoice pdf => 3 jobs
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")
@@ -1438,7 +1438,7 @@ class TestEDIUpflowInvoicesPDF(EDIUpflowCommonCase):
                 "res_id": self.invoice.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1458,7 +1458,7 @@ class TestEDIUpflowInvoicesPDF(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostInvoicePDF.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1508,7 +1508,7 @@ class TestEDIUpflowCreditNotes(EDIUpflowCommonCase):
         with trap_jobs() as trap:
             self.refund.action_post()
             # 1 customer + 1 refund + 1pdf => 2 jobs
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")
@@ -1521,7 +1521,7 @@ class TestEDIUpflowCreditNotes(EDIUpflowCommonCase):
                 "res_id": self.refund.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1541,7 +1541,7 @@ class TestEDIUpflowCreditNotes(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostCreditNotes.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1586,7 +1586,7 @@ class TestEDIUpflowInvoicePayment(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self._register_manual_payment_reconciled(self.invoice)
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -1601,7 +1601,7 @@ class TestEDIUpflowInvoicePayment(EDIUpflowCommonCase):
                 "res_id": move.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1622,7 +1622,7 @@ class TestEDIUpflowInvoicePayment(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostPayments.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1670,7 +1670,7 @@ class TestEDIUpflowRefunds(EDIUpflowCommonCase):
         self.assertEqual(len(records), 0)
         with trap_jobs() as trap:
             self._register_manual_payment_reconciled(self.refund)
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")
@@ -1684,7 +1684,7 @@ class TestEDIUpflowRefunds(EDIUpflowCommonCase):
                 "res_id": move.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1705,7 +1705,7 @@ class TestEDIUpflowRefunds(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostRefunds.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1747,7 +1747,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
         self.assertEqual(self.env["edi.exchange.record"].search_count(domain), 0)
         with trap_jobs() as trap:
             self._register_manual_payment_reconciled(self.invoice)
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")
@@ -1765,7 +1765,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
                 bank_journal=None,
                 method=self.env.ref("account.account_payment_method_manual_out"),
             )
-            trap.assert_jobs_count(0, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(0)
         self.assertEqual(
             self.env["edi.exchange.record"].search_count(domain), count_before
         )
@@ -1809,7 +1809,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
                     }
                 ],
             )
-            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(2)
         reconcile_exchange = self.env["edi.exchange.record"].search(reconcile_domain)
         self.assertEqual(len(reconcile_exchange), 1)
         self.assertEqual(reconcile_exchange.edi_exchange_state, "new")
@@ -1902,7 +1902,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
                 ],
                 partner=False,
             )
-            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(2)
         self.assertEqual(
             self.env["edi.exchange.record"].search_count(reconcile_domain), 1
         )
@@ -1947,7 +1947,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
                 "res_id": partial_reconcile.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -1969,7 +1969,7 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostReconcile.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -1992,6 +1992,41 @@ class TestEdiUpflowReconcileOperation(EDIUpflowCommonCase):
             exchange_record.edi_exchange_state, "output_sent_and_processed"
         )
         self.assertTrue(exchange_record.record.sent_to_upflow)
+
+    def test_unlink_reconcile_delete_exchanges_and_cancel_jobs(self):
+        self._register_manual_payment_reconciled(self.invoice)
+
+        exchange_record = self.env["edi.exchange.record"].search([
+            ("model", "=", "account.partial.reconcile"),
+            (
+                "type_id",
+                "=",
+                self.env.ref("edi_upflow.upflow_edi_exchange_type_post_reconcile").id,
+            ),
+        ])
+        self.assertEqual(len(exchange_record), 1)
+        self.assertEqual(exchange_record.edi_exchange_state, "new")
+        queue_job = (
+            self.env["queue.job"].search([])
+            .filtered(lambda queue_job: queue_job.records.id == exchange_record.id)
+        )
+        self.assertEqual(len(queue_job), 1)
+        self.assertEqual(queue_job.state, "pending")
+
+        with (
+            mock.patch("odoo.addons.mail.models.mail_thread.MailThread.message_post")
+        ) as mock_message_post:
+            exchange_record.record.unlink()
+
+        self.assertFalse(exchange_record.exists())
+        self.assertEqual(queue_job.state, "cancelled")
+        mock_message_post.assert_called_once_with(
+            body="This job has been canceled and its associated EDI exchange was deleted "
+                 "because the associated reconciliation was deleted",
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+            author_id=self.env.ref("base.partner_root").id
+        )
 
 
 @tagged("post_install", "-at_install")
@@ -2021,7 +2056,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.invoice.action_post()
-            trap.assert_jobs_count(3, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(3)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2046,7 +2081,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.partner.street = "abcd"
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2072,7 +2107,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.partner.phone = "101"
-            trap.assert_jobs_count(0, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(0)
 
         self.assertEqual(self.env["edi.exchange.record"].search_count(domain), 0)
 
@@ -2097,7 +2132,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
             self.env["res.partner"].create(
                 {"name": "test", "parent_id": self.partner.id}
             )
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2125,7 +2160,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             contact.unlink()
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2157,7 +2192,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             contact.parent_id = partner2
-            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(2)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 2)
@@ -2188,7 +2223,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.partner.main_contact_id = contact.id
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2216,7 +2251,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
         self.assertEqual(len(records), 0)
         with trap_jobs() as trap:
             contact.name = "test 2"
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2245,7 +2280,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
         self.assertEqual(len(records), 0)
         with trap_jobs() as trap:
             contact.name = "test 2"
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2272,7 +2307,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
         self.assertEqual(len(records), 0)
         with trap_jobs() as trap:
             contact.email = "example@email.com"
-            trap.assert_jobs_count(1, only=self.backend.exchange_generate)
+            trap.assert_jobs_count(1)
 
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
@@ -2287,7 +2322,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
                 "res_id": self.invoice.commercial_partner_id.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         self.assertTrue(
             record._get_file_content(),
         )
@@ -2307,7 +2342,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPostCustomers.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -2401,7 +2436,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
             ".EdiOutputGenerateUpflowPutContacts.generate",
             return_value=generated_content,
         ) as m_generate:
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
             m_generate.assert_called_once()
         self.assertEqual(record._get_file_content(), generated_content)
 
@@ -2422,7 +2457,7 @@ class TestEDIUpflowCustomersContacts(EDIUpflowCommonCase):
                 "res_id": contact.id,
             },
         )
-        self.backend.exchange_generate(record)
+        record.action_exchange_generate()
         m_payload.assert_called_once()
         self.assertEqual(record._get_file_content(), json.dumps({"some": "value"}))
 

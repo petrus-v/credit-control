@@ -25,7 +25,7 @@ class TestEdiUpflowError(EDIUpflowCommonCase):
             EdiOutputGenerateUpflowPostReconcileError,
             "No record found to generate the payload.",
         ):
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()
 
     def test_generate_post_customers_with_no_customer(self):
         customer = self.env["res.partner"].browse()
@@ -40,4 +40,4 @@ class TestEdiUpflowError(EDIUpflowCommonCase):
             EdiOutputGenerateUpflowPostCustomersError,
             "No record found to generate the payload.",
         ):
-            self.backend.exchange_generate(record)
+            record.action_exchange_generate()

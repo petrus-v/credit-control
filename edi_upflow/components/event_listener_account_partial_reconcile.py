@@ -127,17 +127,44 @@ class AccountPartialReconcileUpflowEventListener(Component):
         )
 
     def on_record_unlink(self, account_partial_reconcile):
-        if account_partial_reconcile.sent_to_upflow:
-            # we are not using _create_and_generate_upflow_exchange_record
-            # here because we want to generate payload synchronously
-            # after wards record will be unlinked with no chance to retrieves
-            # upflow_uuid
-            backend = self._get_backend(account_partial_reconcile)
-            if backend:
-                exchange_record = backend.create_record(
-                    "upflow_post_reconcile",
-                    self._get_exchange_record_vals(account_partial_reconcile),
-                )
-                backend.with_context(unlinking_reconcile=True).exchange_generate(
-                    exchange_record
-                )
+        if not account_partial_reconcile.sent_to_upflow:
+            self._delete_exchanges_and_cancel_jobs(account_partial_reconcile)
+            return
+        # we are not using _create_and_generate_upflow_exchange_record
+        # here because we want to generate payload synchronously
+        # after wards record will be unlinked with no chance to retrieves
+        # upflow_uuid
+        backend = self._get_backend(account_partial_reconcile)
+        if not backend:
+            return
+        exchange_record = backend.create_record(
+            "upflow_post_reconcile",
+            self._get_exchange_record_vals(account_partial_reconcile),
+        )
+        exchange_record.with_context(unlinking_reconcile=True).action_exchange_generate()
+
+    def _delete_exchanges_and_cancel_jobs(self, account_partial_reconcile):
+        odoobot = self.env.ref("base.partner_root")
+        message_body = _("This job has been canceled and its associated EDI exchange was deleted "
+                         "because the associated reconciliation was deleted")
+
+        exchanges_to_delete = account_partial_reconcile.exchange_record_ids.filtered(
+            lambda exchange: exchange.edi_exchange_state == "new"
+        )
+        queue_job_model = self.env["queue.job"]
+        channel = self.env.ref("edi_oca.channel_edi_exchange")
+        for exchange_to_delete in exchanges_to_delete:
+            exchange_to_delete.unlink()
+            queue_jobs_to_cancel = queue_job_model.search([
+                ("job_function_id.channel_id", "=", channel.id),
+                ("state", "=", "pending"),
+            ]).filtered(lambda queue_job: queue_job.records.id == exchange_to_delete.id)
+            if not queue_jobs_to_cancel:
+                continue
+            queue_jobs_to_cancel.button_cancelled()
+            queue_jobs_to_cancel.message_post(
+                body=message_body,
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+                author_id=odoobot.id
+            )

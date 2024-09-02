@@ -67,8 +67,8 @@ class TestNoCompanyBackendSet(EDIUpflowCommonCase):
 
         with trap_jobs() as trap:
             self.invoice.action_post()
-            # 1 invoice + 1 PDF=> 2 jobs
-            trap.assert_jobs_count(2, only=self.backend.exchange_generate)
+            # 1 invoice + 1 PDF => 2 jobs
+            trap.assert_jobs_count(2)
         records = self.env["edi.exchange.record"].search(domain)
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "new")

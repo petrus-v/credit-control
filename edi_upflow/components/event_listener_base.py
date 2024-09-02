@@ -26,7 +26,7 @@ class BaseUpflowEventListner(Component):
             exchange_record = backend.create_record(
                 exchange_type, self._get_exchange_record_vals(record)
             )
-            backend.with_delay().exchange_generate(exchange_record)
+            exchange_record.with_delay().action_exchange_generate()
         else:
             return self.env["edi.exchange.record"]
         return exchange_record
