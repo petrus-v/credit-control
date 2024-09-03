@@ -1,9 +1,11 @@
 # Copyright 2023 Foodles (https://www.foodles.com/)
 # @author Pierre Verkest <pierreverkest84@gmail.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+import logging
 
 from odoo.addons.component.core import Component
 
+log = logging.getLogger(__name__)
 
 class BaseUpflowEventListner(Component):
 
@@ -37,6 +39,9 @@ class BaseUpflowEventListner(Component):
         # depends are not computed yet better to refresh value
         moves._compute_upflow_type()
         for move in moves:
+            if not move.upflow_commercial_partner_id:
+                log.warning("No Upflow commercial partner found for move %s, ignoring", move)
+                continue
             exchange_type, pdf_exchange = move.mapping_upflow_exchange().get(
                 move.upflow_type,
                 (

@@ -810,6 +810,35 @@ class TestFlows(EDIUpflowCommonCaseRunningJob):
         self.assertEqual(len(records), 1)
         self.assertEqual(records.edi_exchange_state, "output_sent_and_processed")
 
+    def test_post_payments_without_partner_id(self):
+        with mock.patch(
+            "odoo.addons.edi_upflow.components"
+            ".edi_output_generate_upflow_post_payments"
+            ".EdiOutputGenerateUpflowPostPayments.generate",
+        ) as m_generate, mock.patch(
+            "odoo.addons.edi_upflow.components.event_listener_base.log"
+        ) as m_log:
+            bank_journal, method, payment_date, amount, currency = self._payment_params(
+                self.invoice,
+            )
+            payment = self.env["account.payment"].create(
+                {
+                    "payment_type": "inbound",
+                    "partner_type": "customer",
+                    "journal_id": bank_journal.id,
+                    "payment_method_id": method.id,
+                    "amount": amount,
+                    "currency_id": currency.id,
+                    "date": payment_date,
+                }
+            )
+            payment.action_post()
+            m_generate.assert_not_called()
+            m_log.warning.assert_called_once_with(
+                "No Upflow commercial partner found for move %s, ignoring",
+                payment.move_id,
+            )
+
     @mute_logger("odoo.addons.queue_job.delay")
     @responses.activate
     def test_output_exchange_sync_post_refunds_flow(self):
